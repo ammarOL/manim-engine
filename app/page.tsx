@@ -9,6 +9,7 @@ export default function Home() {
   const [videoURL, setVideoURL] = useState("");
 
   async function handleSubmit() {
+    setVideoURL("");
     const response = await axios.post("/api/generate", { prompt: prompt });
 
     let code = response.data.message
@@ -16,8 +17,8 @@ export default function Home() {
       .replace(/```/g, "")
       .trim();
 
-    setVideoURL("/videos/scene/480p15/Output.mp4");
     setResponse(code);
+    setVideoURL("/videos/scene/480p15/Output.mp4");
   }
 
   return (
@@ -41,7 +42,9 @@ export default function Home() {
         <button>Submit Message</button>
       </form>
       <div>{response}</div>
-      {videoURL && (
+      {videoURL === "" ? (
+        <div>Loading</div>
+      ) : (
         <video width="320" height="240" controls src={videoURL}></video>
       )}
     </div>

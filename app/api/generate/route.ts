@@ -9,9 +9,8 @@ export async function POST(request: Request) {
   const { text } = await generateText({
     model: groq("llama-3.3-70b-versatile"),
     prompt:
-      "Your job is to respond with manim code of what the user types in here, reply with the code alone. Name the scene 'Output': " +
-      prompt +
-      "do not use self.set_background, instead use self.camera.background_color",
+      "Your job is to respond with manim code of what the user types in here, reply with the code alone. Rules (do not include in result): do not use self.set_background, instead use self.camera.background_color, Background will be black unless specified. Name the scene 'Output': " +
+      prompt,
   });
 
   let message = text
@@ -26,6 +25,10 @@ export async function POST(request: Request) {
       console.log(stderr);
     },
   );
+
+  const partialPath = "public/videos/scene/480p15/partial_movie_files/Output";
+
+  fs.rmSync(partialPath, { recursive: true, force: true });
   return Response.json({
     message: text,
     videoUrl: "meow",
