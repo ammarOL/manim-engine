@@ -6,10 +6,18 @@ import { useState } from "react";
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [response, setResponse] = useState("");
+  const [videoURL, setVideoURL] = useState("");
 
   async function handleSubmit() {
     const response = await axios.post("/api/generate", { prompt: prompt });
-    setResponse(response.data.message);
+
+    let code = response.data.message
+      .replace(/```python/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    setVideoURL("/videos/scene/480p15/Output.mp4");
+    setResponse(code);
   }
 
   return (
@@ -33,6 +41,9 @@ export default function Home() {
         <button>Submit Message</button>
       </form>
       <div>{response}</div>
+      {videoURL && (
+        <video width="320" height="240" controls src={videoURL}></video>
+      )}
     </div>
   );
 }
