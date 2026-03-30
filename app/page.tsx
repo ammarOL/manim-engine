@@ -28,9 +28,11 @@ function getOrCreateClientSessionId() {
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [response, setResponse] = useState("");
+  const [codeDraft, setCodeDraft] = useState("");
   const [videoURL, setVideoURL] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isSending, setIsSending] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isCompiling, setIsCompiling] = useState(false);
   const [clientSessionId, setClientSessionId] = useState("");
 
   useEffect(() => {
@@ -52,7 +54,7 @@ export default function Home() {
   }, []);
 
   async function handleSubmit() {
-    if (!prompt.trim() || isSending) return;
+    if (!prompt.trim() || isGenerating || isCompiling) return;
     const activeSessionId = clientSessionId || getOrCreateClientSessionId();
     if (!activeSessionId) return;
 
@@ -60,7 +62,7 @@ export default function Home() {
     setMessages((prev) => [...prev, userMessage]);
     setPrompt("");
     setVideoURL("");
-    setIsSending(true);
+    setIsGenerating(true);
 
     try {
       const response = await axios.post("/api/generate", {
@@ -76,6 +78,7 @@ export default function Home() {
           : "";
 
       setResponse(code);
+      setCodeDraft(code);
       setVideoURL(generatedVideoUrl);
       setMessages((prev) => [
         ...prev,
@@ -96,7 +99,53 @@ export default function Home() {
         },
       ]);
     } finally {
-      setIsSending(false);
+      setIsGenerating(false);
+    }
+  }
+
+  async function handleRecompile() {
+    if (!codeDraft.trim() || isCompiling || isGenerating) return;
+    const activeSessionId = clientSessionId || getOrCreateClientSessionId();
+    if (!activeSessionId) return;
+
+    setIsCompiling(true);
+    try {
+      const response = await axios.post("/api/compile", {
+        code: codeDraft,
+        clientSessionId: activeSessionId,
+      });
+
+      const compiledCode =
+        typeof response.data.code === "string" ? response.data.code.trim() : "";
+      const compiledVideoUrl =
+        typeof response.data.videoUrl === "string"
+          ? response.data.videoUrl
+          : "";
+
+      setResponse(compiledCode);
+      setCodeDraft(compiledCode);
+      setVideoURL(compiledVideoUrl);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            compiledCode.length > 0
+              ? "Recompiled your edited code successfully. Check the updated video."
+              : "I could not compile this version of the code.",
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Recompile failed. Please check your Manim code and try again.",
+        },
+      ]);
+    } finally {
+      setIsCompiling(false);
     }
   }
 
@@ -140,14 +189,16 @@ export default function Home() {
                 onChange={(e) => {
                   setPrompt(e.target.value);
                 }}
-                disabled={isSending}
+                disabled={isGenerating || isCompiling}
               />
               <button
                 type="submit"
                 className="px-4 py-2 rounded-md bg-black text-white disabled:opacity-50"
-                disabled={isSending || prompt.trim().length === 0}
+                disabled={
+                  isGenerating || isCompiling || prompt.trim().length === 0
+                }
               >
-                {isSending ? "Sending..." : "Send"}
+                {isGenerating ? "Generating..." : "Send"}
               </button>
             </form>
           </div>
@@ -156,9 +207,34 @@ export default function Home() {
         <ResizablePanel>
           <ResizablePanelGroup orientation="vertical">
             <ResizablePanel className="m-4">
-              <div>
-                <div>Output Code</div>
-                <div>{response}</div>
+              <div className="h-full flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div>Output Code</div>
+                  <button
+                    type="button"
+                    onClick={handleRecompile}
+                    className="px-3 py-1 rounded-md bg-black text-white disabled:opacity-50 text-sm"
+                    disabled={
+                      isCompiling ||
+                      isGenerating ||
+                      codeDraft.trim().length === 0
+                    }
+                  >
+                    {isCompiling ? "Recompiling..." : "Recompile"}
+                  </button>
+                </div>
+                <textarea
+                  value={codeDraft}
+                  onChange={(e) => setCodeDraft(e.target.value)}
+                  className="w-full h-full min-h-56 border rounded-md p-3 font-mono text-sm"
+                  placeholder="Generated Manim code will appear here. Edit it, then click Recompile."
+                  disabled={isCompiling || isGenerating}
+                />
+                {response.length > 0 ? (
+                  <div className="text-xs text-neutral-500">
+                    Last successful compile is loaded in the editor.
+                  </div>
+                ) : null}
               </div>
             </ResizablePanel>
             <ResizableHandle />

@@ -1,5 +1,3 @@
-import { groq } from "@ai-sdk/groq";
-import { generateText } from "ai";
 import {
   RenderExecutionError,
   RenderValidationError,
@@ -7,22 +5,11 @@ import {
 } from "@/lib/manim-render";
 
 export async function POST(request: Request) {
-  const { prompt, clientSessionId } = await request.json();
-  if (typeof prompt !== "string" || prompt.trim().length === 0) {
-    return Response.json({ error: "Prompt is required." }, { status: 400 });
-  }
-
-  const { text } = await generateText({
-    model: groq("llama-3.3-70b-versatile"),
-    prompt:
-      "Your job is to respond with manim code of what the user types in here, reply with the code alone. Rules (do not include in result): do not use self.set_background, instead use self.camera.background_color, Background will be black unless specified." +
-      " Include exactly one Scene class: " +
-      prompt.trim(),
-  });
+  const { code, clientSessionId } = await request.json();
 
   try {
     const result = await renderFromCode({
-      rawCode: text,
+      rawCode: code,
       clientSessionId,
     });
     return Response.json(result);
@@ -36,6 +23,7 @@ export async function POST(request: Request) {
         { status: 500 },
       );
     }
+
     return Response.json(
       {
         error: "Unexpected render failure.",
