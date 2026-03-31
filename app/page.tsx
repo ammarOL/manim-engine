@@ -25,6 +25,18 @@ function getOrCreateClientSessionId() {
   return created;
 }
 
+function ToolIcon({ label }: { label: string }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className="h-8 w-8 rounded-full border border-[var(--chat-tool-border)] text-[13px] text-[var(--chat-tool-foreground)] bg-[var(--chat-tool-bg)] hover:bg-white transition-colors"
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [response, setResponse] = useState("");
@@ -59,7 +71,8 @@ export default function Home() {
     if (!activeSessionId) return;
 
     const userMessage: ChatMessage = { role: "user", content: prompt.trim() };
-    setMessages((prev) => [...prev, userMessage]);
+    const nextHistory = [...messages, userMessage];
+    setMessages(nextHistory);
     setPrompt("");
     setVideoURL("");
     setIsGenerating(true);
@@ -67,6 +80,7 @@ export default function Home() {
     try {
       const response = await axios.post("/api/generate", {
         prompt: userMessage.content,
+        history: nextHistory,
         clientSessionId: activeSessionId,
       });
 
@@ -76,27 +90,27 @@ export default function Home() {
         typeof response.data.videoUrl === "string"
           ? response.data.videoUrl
           : "";
+      const assistantReply =
+        typeof response.data.assistantReply === "string"
+          ? response.data.assistantReply.trim()
+          : "I generated your Manim scene.";
 
       setResponse(code);
       setCodeDraft(code);
       setVideoURL(generatedVideoUrl);
       setMessages((prev) => [
         ...prev,
-        {
-          role: "assistant",
-          content:
-            code.length > 0
-              ? "I generated the code and video. Check the Output Code and Generated Video panels."
-              : "I couldn't generate code this time. Try rephrasing your prompt.",
-        },
+        { role: "assistant", content: assistantReply },
       ]);
-    } catch {
+    } catch (error) {
+      const fallback =
+        axios.isAxiosError(error) &&
+        typeof error.response?.data?.assistantReply === "string"
+          ? error.response.data.assistantReply
+          : "I ran into an issue while generating that scene. Please try again.";
       setMessages((prev) => [
         ...prev,
-        {
-          role: "assistant",
-          content: "Something went wrong while generating. Please try again.",
-        },
+        { role: "assistant", content: fallback },
       ]);
     } finally {
       setIsGenerating(false);
@@ -130,9 +144,7 @@ export default function Home() {
         {
           role: "assistant",
           content:
-            compiledCode.length > 0
-              ? "Recompiled your edited code successfully. Check the updated video."
-              : "I could not compile this version of the code.",
+            "I recompiled your edited code. The preview on the right is updated.",
         },
       ]);
     } catch {
@@ -140,8 +152,7 @@ export default function Home() {
         ...prev,
         {
           role: "assistant",
-          content:
-            "Recompile failed. Please check your Manim code and try again.",
+          content: "Recompile failed. Please fix the code and try again.",
         },
       ]);
     } finally {
@@ -150,66 +161,89 @@ export default function Home() {
   }
 
   return (
-    <div className="h-screen">
-      <ResizablePanelGroup orientation="horizontal" className="h-full">
-        <ResizablePanel className="h-full w-full">
-          <div className="flex flex-col h-full">
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+    <div className="h-screen bg-[var(--chat-page-bg)] p-3 md:p-4">
+      <ResizablePanelGroup
+        orientation="horizontal"
+        className="h-full rounded-3xl border border-[var(--chat-border)] bg-[var(--chat-surface)] shadow-[0_20px_45px_-28px_rgba(35,35,35,0.3)]"
+      >
+        <ResizablePanel className="h-full w-full min-w-[320px]">
+          <div className="flex h-full flex-col p-3 md:p-4">
+            <div className="mb-2 px-2 text-xs font-medium uppercase tracking-[0.08em] text-neutral-500">
+              Manim Chat
+            </div>
+
+            <div className="flex-1 overflow-y-auto rounded-2xl border border-[var(--chat-border)] bg-[var(--chat-history-bg)] p-3 md:p-4">
               {messages.length === 0 ? (
-                <div className="text-sm text-neutral-500">
-                  Ask for a Manim scene and I will generate code and a video.
+                <div className="mx-auto mt-12 max-w-sm rounded-2xl border border-dashed border-[var(--chat-border)] bg-[var(--chat-surface)] p-5 text-center text-sm text-neutral-500">
+                  Ask anything about a scene. I will reply conversationally and
+                  generate code plus video.
                 </div>
               ) : (
-                messages.map((message, index) => (
-                  <div
-                    key={`${message.role}-${index}`}
-                    className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                      message.role === "user"
-                        ? "ml-auto bg-black text-white"
-                        : "bg-neutral-100 text-neutral-900"
-                    }`}
-                  >
-                    {message.content}
-                  </div>
-                ))
+                <div className="space-y-3">
+                  {messages.map((message, index) => (
+                    <div
+                      key={`${message.role}-${index}`}
+                      className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed shadow-sm ${
+                        message.role === "user"
+                          ? "ml-auto bg-[var(--chat-user-bg)] text-white"
+                          : "bg-[var(--chat-assistant-bg)] text-[var(--chat-assistant-fg)]"
+                      }`}
+                    >
+                      {message.content}
+                    </div>
+                  ))}
+
+                  {isGenerating ? (
+                    <div className="max-w-[88%] rounded-2xl bg-[var(--chat-assistant-bg)] px-4 py-2.5 text-[14px] text-[var(--chat-assistant-fg)]">
+                      <span className="animate-pulse">
+                        Thinking and rendering...
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
               )}
             </div>
+
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 handleSubmit();
               }}
-              className="w-full border-t p-4 flex gap-2"
+              className="mt-3 rounded-[1.4rem] border border-[var(--chat-border)] bg-[var(--chat-composer-bg)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]"
             >
               <input
                 type="text"
-                placeholder="Describe the scene you want..."
-                className="border py-2 px-3 rounded-md flex-1"
+                placeholder="Ask anything"
+                className="h-10 w-full bg-transparent px-1 text-[15px] text-neutral-800 placeholder:text-neutral-500 outline-none"
                 value={prompt}
-                onChange={(e) => {
-                  setPrompt(e.target.value);
-                }}
+                onChange={(e) => setPrompt(e.target.value)}
                 disabled={isGenerating || isCompiling}
               />
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-md bg-black text-white disabled:opacity-50"
-                disabled={
-                  isGenerating || isCompiling || prompt.trim().length === 0
-                }
-              >
-                {isGenerating ? "Generating..." : "Send"}
-              </button>
+
+              <div className="mt-2 flex items-center justify-between">
+                <div className="flex items-center gap-2"></div>
+                <button
+                  type="submit"
+                  className="h-9 w-9 rounded-xl bg-neutral-900 text-lg text-white transition-opacity disabled:opacity-50"
+                  disabled={
+                    isGenerating || isCompiling || prompt.trim().length === 0
+                  }
+                >
+                  ↑
+                </button>
+              </div>
             </form>
           </div>
         </ResizablePanel>
+
         <ResizableHandle />
+
         <ResizablePanel>
           <ResizablePanelGroup orientation="vertical">
             <ResizablePanel className="m-4">
               <div className="h-full flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <div>Output Code</div>
+                  <div className="font-medium">Output Code</div>
                   <button
                     type="button"
                     onClick={handleRecompile}
@@ -242,17 +276,21 @@ export default function Home() {
             <ResizablePanel>
               <div className="w-full h-full">
                 {videoURL === "" ? (
-                  <div>Loading...</div>
+                  <div className="p-6 text-sm text-neutral-500">
+                    Video output will appear here after generation.
+                  </div>
                 ) : (
                   <div className="w-full h-full">
-                    <div className="mx-4 mt-4 mb-4">Generated Video</div>
+                    <div className="mx-4 mt-4 mb-4 font-medium">
+                      Generated Video
+                    </div>
                     <video
                       width="320"
                       height="240"
                       controls
                       className="w-[90%] mx-auto"
                       src={videoURL}
-                    ></video>
+                    />
                   </div>
                 )}
               </div>
