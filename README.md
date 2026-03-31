@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# engine-manim
 
-## Getting Started
+AI-assisted Manim scene generation with a Next.js UI and server-side Python rendering.
 
-First, run the development server:
+## Docker-First Quickstart (Recommended)
+
+### 1) Configure env
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Set `GROQ_API_KEY` in `.env.local`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2) Run in development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+docker compose up --build
+```
 
-## Learn More
+Open `http://localhost:3000`.
 
-To learn more about Next.js, take a look at the following resources:
+The app runs with hot reload and writes render artifacts under:
+- `python/jobs`
+- `public/jobs`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 3) Stop
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+docker compose down
+```
 
-## Deploy on Vercel
+If you also want to remove dev volumes (including cached dependencies):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+docker compose down -v
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Production Container
+
+Build:
+
+```bash
+docker build -t engine-manim:latest .
+```
+
+Run:
+
+```bash
+docker run --rm -p 3000:3000 --env-file .env.local engine-manim:latest
+```
+
+## Optional Host-Native Setup (Without Docker)
+
+You need Node.js + Python + Manim system dependencies (FFmpeg/LaTeX stack), then:
+
+```bash
+npm ci
+npm run dev
+```
+
+## Troubleshooting
+
+### Missing `GROQ_API_KEY`
+- Symptom: generation endpoint fails quickly.
+- Fix: ensure `.env.local` exists and includes a valid `GROQ_API_KEY`, then restart the container.
+
+### Render failures inside container
+- Symptom: `/api/generate` or `/api/compile` returns render errors.
+- Fix: inspect container logs with `docker compose logs -f app` and verify the generated Manim code is valid.
+
+### Slow or failing renders
+- Symptom: long render times, process crashes, or unstable behavior.
+- Fix: allocate more Docker memory/CPU, reduce scene complexity, and retry.
+
+## Security Note
+
+- Never commit `.env.local`.
+- Rotate any key that was accidentally shared in commits, screenshots, terminal history, or chat.
