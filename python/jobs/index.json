@@ -1,3 +1,12 @@
 {
-  "sessions": {}
+  "sessions": {
+    "643920d4-2a17-4457-b23a-84f1ee15ddbc": {
+      "jobIds": [
+        "32658a30-0905-4cd1-a869-dc2e487ccca2",
+        "e3075388-5b94-48ba-80c7-c04d4103d39f",
+        "99925b5d-90d5-4cbb-a2f5-ba3a5ce95207"
+      ],
+      "lastSeenAt": 1775143922822
+    }
+  }
 }
